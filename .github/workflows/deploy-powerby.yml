@@ -44,12 +44,18 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
+      # CORRECTED: Added a step to install the required Power BI management modules.
+      # The 'Connect-PowerBIServiceAccount' cmdlet is part of this module.
+      - name: 📦 Install Power BI PowerShell Modules
+        shell: pwsh
+        run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
+
       - name: 🚀 Deploy PBIP to DEV Workspace
-        # CORRECTED: Using 'shell: pwsh' is the recommended way to run multi-line PowerShell scripts in GitHub Actions.
-        # This avoids complex quoting issues that can arise from using 'run: pwsh -c "..."'.
+        # This script now runs after the required modules have been installed.
         shell: pwsh
         run: |
           # Import the custom PowerShell module for Fabric/Power BI operations.
+          # This module likely contains the custom 'Publish-PowerBIProject' function.
           Import-Module './FabricPS-PBIP.psm1'
 
           # Retrieve credentials and identifiers from environment variables.
@@ -64,13 +70,13 @@ jobs:
           }
 
           # Connect to the Power BI service using the service principal credentials.
+          # This command is now available because the MicrosoftPowerBIMgmt module was installed in the previous step.
           Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ClientSecret $ClientSecret
 
           # Verify that the Power BI Project (PBIP) folder exists at the specified path.
           Write-Host '📁 Verifying PBIP project folder...'
           $pbipPath = './powerbi/AdventureWorks Report.pbip'
           if (!(Test-Path $pbipPath)) {
-            # CORRECTED: Removed extra quotes from the throw statement, as they are no longer needed when using 'shell: pwsh'.
             throw "❌ PBIP project folder not found at path: $pbipPath"
           }
 
