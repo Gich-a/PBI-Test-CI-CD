@@ -1,111 +1,16 @@
-# GitHub Actions Workflow for deploying a Power BI Project (PBIP)
-# This workflow includes steps for testing the project structure and deploying to a development workspace.
-
-name: Power BI Deployment Pipeline
-
+name: Deploy Power BI
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    name: Run PBIP Structural Tests
-
+  deploy:
+    runs-on: windows-latest
     steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 📦 Install Python dependencies
-        run: pip install -r requirements.txt
-
-      - name: 🧪 Run PBIP structure tests
-        run: python tests/tests.py powerbi/
-
-  deploy-dev:
-    needs: test
-    runs-on: ubuntu-latest
-    name: Deploy PBIP to DEV Workspace
-    
-    # Environment variables are mapped from GitHub secrets to be used in the deployment script.
-    # These secrets must be configured in your repository's settings.
-    env:
-      TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
-      CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
-      CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
-      WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
-
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      # Install the required Power BI management modules.
-      # The 'Connect-PowerBIServiceAccount' cmdlet is part of this module.
       - name: 📦 Install Power BI PowerShell Modules
         shell: pwsh
         run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
 
       - name: 🚀 Deploy PBIP to DEV Workspace
         shell: pwsh
-        run: |
-          # Define the path to the custom PowerShell module.
-          $modulePath = './FabricPS-PBIP.psm1'
-
-          # Verify that the custom PowerShell module exists.
-          Write-Host "📁 Verifying custom PowerShell module at path: $modulePath"
-          if (!(Test-Path $modulePath)) {
-            throw "❌ Custom PowerShell module not found at path: $modulePath. Please ensure 'FabricPS-PBIP.psm1' exists in your repository's root or adjust the path."
-          }
-
-          # Import the custom PowerShell module for Fabric/Power BI operations.
-          # This module must contain the 'Publish-PowerBIProject' function.
-          Import-Module $modulePath
-
-          # --- DIAGNOSTIC STEP: List commands from the imported module ---
-          Write-Host "🔍 Listing commands available from '$($modulePath)' module:"
-          Get-Command -Module (Get-Module -Name FabricPS-PBIP).Name | Format-Table Name, CommandType
-          Write-Host "--------------------------------------------------------"
-          Write-Host "☝️ Please check the output above to ensure 'Publish-PowerBIProject' is listed."
-          # -----------------------------------------------------------
-
-          # Retrieve credentials and identifiers from environment variables.
-          $ClientId = $env:CLIENT_ID
-          $ClientSecret = $env:CLIENT_SECRET
-          $TenantId = $env:TENANT_ID
-          $WorkspaceId = $env:WORKSPACE_ID
-
-          # Use [string]::IsNullOrEmpty() for a more robust check of environment variables.
-          if ([string]::IsNullOrEmpty($ClientId) -or [string]::IsNullOrEmpty($ClientSecret) -or [string]::IsNullOrEmpty($TenantId) -or [string]::IsNullOrEmpty($WorkspaceId)) {
-            throw '🔐 Missing required environment variables. Ensure PBI_TENANT_ID, PBI_CLIENT_ID, PBI_CLIENT_SECRET, and PBI_WORKSPACE_ID_DEV secrets are set.'
-          }
-
-          # Convert the client secret to a secure string.
-          $SecureClientSecret = ConvertTo-SecureString -String $ClientSecret -AsPlainText -Force
-
-          # Create a PSCredential object. For service principal, ClientId acts as username.
-          $Credential = New-Object System.Management.Automation.PSCredential($ClientId, $SecureClientSecret)
-
-          # Connect to the Power BI service using the service principal credentials.
-          # This command is now available because the MicrosoftPowerBIMgmt module was installed in the previous step.
-          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -Credential $Credential
-
-          # Verify that the Power BI Project (PBIP) folder exists at the specified path.
-          Write-Host '📁 Verifying PBIP project folder...'
-          $pbipPath = './powerbi/AdventureWorks Report.pbip'
-          if (!(Test-Path $pbipPath)) {
-            throw "❌ PBIP project folder not found at path: $pbipPath"
-          }
-
-          # Publish the project to the specified Power BI workspace.
-          # CORRECTED: Removed -EnableRefresh and -Overwrite as they are not recognized parameters for Import-FabricItem.
-          # You will need to consult your FabricPS-PBIP.psm1 module's documentation for correct parameters
-          # to enable refresh or overwrite behavior, if those functionalities are desired.
-          Write-Host '📦 Deploying PBIP artifact using Import-FabricItem...'
-          Import-FabricItem -Path $pbipPath -WorkspaceId $WorkspaceId
-
-          Write-Host '✅ Deployment successful.'
+        run: pwsh ./scripts/deploy-pbip.ps1
