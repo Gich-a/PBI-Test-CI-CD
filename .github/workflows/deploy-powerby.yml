@@ -1,0 +1,134 @@
+name: Power BI Deployment Pipeline
+
+on:
+  push:
+    branches: [main] # This workflow runs on pushes to the 'main' branch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run PBIP Structural Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Checks out your repository code
+
+      - name: Set up Python
+        uses: actions/setup-python@v5 # Configures Python environment
+        with:
+          python-version: '3.11' # Specifies Python version
+
+      - name: Install Python dependencies
+        # This will install 'requests' from your requirements.txt
+        run: pip install -r requirements.txt
+
+      - name: Run PBIP structural tests
+        # Executes your tests.py script against the powerbi/ directory
+        run: python tests/tests.py powerbi/
+
+  deploy-dev:
+    needs: test # This job will only run after the 'test' job completes successfully
+    runs-on: ubuntu-latest
+    name: Deploy to Development Environment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Checks out your repository code again for this job
+
+      - name: Install jq
+        # jq is a lightweight and flexible command-line JSON processor,
+        # essential for parsing API responses in the shell scripts below.
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Deploy PBIX to DEV Workspace and Trigger Refresh
+        env:
+          TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
+          WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }} # ID of your Power BI Development Workspace
+          DATASET_DISPLAY_NAME_DEV: AdventureWorks_dev # The desired display name for the dataset in DEV
+        run: |
+          echo "🔐 Authenticating for DEV Power BI Service..."
+          # Request an access token using client credentials flow
+          token_response=$(curl -s -X POST "https://login.microsoftonline.com/$TENANT_ID/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&scope=https://analysis.windows.net/powerbi/api/.default")
+
+          # Extract the access token using jq
+          ACCESS_TOKEN=$(echo "$token_response" | jq -r '.access_token')
+          if [ "$ACCESS_TOKEN" == "null" ]; then
+            echo "Authentication failed. Token not received."
+            echo "Full token response: $token_response"
+            exit 1
+          fi
+          echo "Authentication successful."
+
+          echo "🚀 Initiating deployment of 'AdventureWorks Report Main.pbix' to DEV Workspace (ID: $WORKSPACE_ID)..."
+          # Perform the PBIX import, capturing the initial asynchronous response
+          import_init_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -F "file=@powerbi/AdventureWorks Report Main.pbix" \
+            "https://api.powerbi.com/v1.0/myorg/groups/$WORKSPACE_ID/imports?datasetDisplayName=$DATASET_DISPLAY_NAME_DEV&nameConflict=CreateOrOverwrite")
+          
+          echo "Initial Import API Response: $import_init_response"
+
+          # Extract the Import ID from the initial response
+          IMPORT_ID=$(echo "$import_init_response" | jq -r '.id')
+
+          if [ "$IMPORT_ID" == "null" ]; then
+            echo "Failed to get Import ID from initial import response. Aborting."
+            echo "Full import init response: $import_init_response"
+            exit 1
+          fi
+          echo "Power BI import process initiated with ID: $IMPORT_ID"
+
+          # --- Polling loop to wait for import completion ---
+          echo "Polling Power BI import status (this may take a few minutes for larger files)..."
+          import_status="NotStarted"
+          timeout_seconds=600 # Maximum wait time for import to complete (10 minutes)
+          start_time=$(date +%s)
+          
+          # Loop until import succeeds, fails, or times out
+          while [[ "$import_status" != "Succeeded" && "$import_status" != "Failed" && "$(($(date +%s) - $start_time))" -lt "$timeout_seconds" ]]; do
+            sleep 15 # Wait 15 seconds before checking status again
+            
+            # Fetch the current status of the import operation
+            import_details_response=$(curl -s -X GET \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              "https://api.powerbi.com/v1.0/myorg/groups/$WORKSPACE_ID/imports/$IMPORT_ID")
+            
+            import_status=$(echo "$import_details_response" | jq -r '.importState')
+            echo "Current Import State: $import_status (elapsed: $(($(date +%s) - $start_time))s / ${timeout_seconds}s)"
+          done
+
+          # Check if the import completed successfully
+          if [ "$import_status" != "Succeeded" ]; then
+            echo "❌ Power BI import did not succeed within the timeout period. Final state: $import_status"
+            echo "Full import details response: $import_details_response"
+            exit 1
+          fi
+
+          echo "✅ Power BI import succeeded. Retrieving Dataset ID..."
+          # Extract the Dataset ID from the final import details response (now that it's Succeeded)
+          DATASET_ID=$(echo "$import_details_response" | jq -r '.datasets[0].id')
+
+          if [ "$DATASET_ID" == "null" ]; then
+            echo "❌ Failed to get Dataset ID from import details response after successful import."
+            echo "Full import details response: $import_details_response"
+            exit 1
+          fi
+          echo "Dataset ID for '$DATASET_DISPLAY_NAME_DEV': $DATASET_ID"
+
+          echo "🔄 Triggering Dataset Refresh for '$DATASET_DISPLAY_NAME_DEV' (ID: $DATASET_ID)..."
+          # Trigger the dataset refresh
+          refresh_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "https://api.powerbi.com/v1.0/myorg/groups/$WORKSPACE_ID/datasets/$DATASET_ID/refreshes")
+          
+          echo "Refresh Trigger API Response: $refresh_response"
+
+          # Basic check for refresh initiation success
+          if echo "$refresh_response" | grep -q '"error"'; then
+            echo "❌ Dataset refresh failed to initiate!"
+            exit 1
+          else
+            echo "✅ Dataset refresh initiated successfully."
+          fi
