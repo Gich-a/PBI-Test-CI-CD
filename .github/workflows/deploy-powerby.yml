@@ -102,9 +102,10 @@ jobs:
           }
 
           # Publish the project to the specified Power BI workspace.
-          # CORRECTED: Changed Publish-PowerBIProject to Import-FabricItem
-          # Assuming Import-FabricItem accepts -Path, -WorkspaceId, -EnableRefresh, -Overwrite
+          # CORRECTED: Removed -EnableRefresh and -Overwrite as they are not recognized parameters for Import-FabricItem.
+          # You will need to consult your FabricPS-PBIP.psm1 module's documentation for correct parameters
+          # to enable refresh or overwrite behavior, if those functionalities are desired.
           Write-Host '📦 Deploying PBIP artifact using Import-FabricItem...'
-          Import-FabricItem -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
+          Import-FabricItem -Path $pbipPath -WorkspaceId $WorkspaceId
 
           Write-Host '✅ Deployment successful.'
