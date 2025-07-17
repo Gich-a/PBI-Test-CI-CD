@@ -1,3 +1,6 @@
+# GitHub Actions Workflow for deploying a Power BI Project (PBIP)
+# This workflow includes steps for testing the project structure and deploying to a development workspace.
+
 name: Power BI Deployment Pipeline
 
 on:
@@ -28,37 +31,55 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     name: Deploy PBIP to DEV Workspace
+    
+    # Environment variables are mapped from GitHub secrets to be used in the deployment script.
+    # These secrets must be configured in your repository's settings.
+    env:
+      TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
+      CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
+      WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
       - name: 🚀 Deploy PBIP to DEV Workspace
-        env:
-          TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
-          CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
-          WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
-        run: pwsh -c "
-          Import-Module './FabricPS-PBIP.psm1'
+        # This step uses PowerShell to deploy the Power BI project.
+        # It connects to the Power BI service using a service principal and then publishes the project.
+        run: |
+          pwsh -c '
+          # Import the custom PowerShell module for Fabric/Power BI operations.
+          Import-Module "./FabricPS-PBIP.psm1"
 
+          # Retrieve credentials and identifiers from environment variables.
           $ClientId = $env:CLIENT_ID
           $ClientSecret = $env:CLIENT_SECRET
           $TenantId = $env:TENANT_ID
           $WorkspaceId = $env:WORKSPACE_ID
 
-          if (-not $ClientId -or -not $ClientSecret -or -not $TenantId -or -not $WorkspaceId) {
-            throw '🔐 Missing required environment variables.'
+          # CORRECTED: Use [string]::IsNullOrEmpty() for a more robust check of environment variables.
+          # This prevents a ParserError if any of the variables are empty.
+          if ([string]::IsNullOrEmpty($ClientId) -or 
+              [string]::IsNullOrEmpty($ClientSecret) -or 
+              [string]::IsNullOrEmpty($TenantId) -or 
+              [string]::IsNullOrEmpty($WorkspaceId)) {
+            throw '🔐 Missing required environment variables. Ensure PBI_TENANT_ID, PBI_CLIENT_ID, PBI_CLIENT_SECRET, and PBI_WORKSPACE_ID_DEV secrets are set.'
           }
 
+          # Connect to the Power BI service using the service principal credentials.
           Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ClientSecret $ClientSecret
 
+          # Verify that the Power BI Project (PBIP) folder exists at the specified path.
           Write-Host '📁 Verifying PBIP project folder...'
           $pbipPath = './powerbi/AdventureWorks Report.pbip'
           if (!(Test-Path $pbipPath)) {
-            throw '❌ PBIP project folder not found.'
+            throw ""❌ PBIP project folder not found at path: $pbipPath""
           }
 
+          # Publish the project to the specified Power BI workspace.
+          # -EnableRefresh will trigger a dataset refresh after publishing.
+          # -Overwrite will update the existing report and dataset if they already exist.
           Write-Host '📦 Deploying PBIP artifact...'
           Publish-PowerBIProject -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
 
