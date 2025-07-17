@@ -2,10 +2,30 @@ name: Power BI Deployment Pipeline
 
 on:
   push:
-    branches: [main] # Trigger deployment on push to main branch
+    branches: [main]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run PBIP Structural Tests
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🧪 Run PBIP structure tests
+        run: python tests/tests.py powerbi/
+
   deploy-dev:
+    needs: test
     runs-on: ubuntu-latest
     name: Deploy PBIP to DEV Workspace
 
@@ -13,7 +33,7 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🛠 Install PowerShell and FabricPS Module
+      - name: 🛠 Install PowerShell and FabricPS
         run: |
           sudo apt-get update
           sudo apt-get install -y powershell
@@ -25,27 +45,30 @@ jobs:
           CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
           WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
-        run: |
-          pwsh -Command "
-            Import-Module FabricPS
+        run: pwsh -Command @'
+          Import-Module FabricPS
 
-            $ClientId = $env:CLIENT_ID
-            $ClientSecret = $env:CLIENT_SECRET
-            $TenantId = $env:TENANT_ID
-            $WorkspaceId = $env:WORKSPACE_ID
+          $ClientId = "${env:CLIENT_ID}"
+          $ClientSecret = "${env:CLIENT_SECRET}"
+          $TenantId = "${env:TENANT_ID}"
+          $WorkspaceId = "${env:WORKSPACE_ID}"
 
-            $SecurePassword = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ($ClientId, $SecurePassword)
+          if (-not $ClientId -or -not $ClientSecret -or -not $TenantId -or -not $WorkspaceId) {
+            throw "🔐 Missing one or more required environment variables."
+          }
 
-            Connect-FabricTenant -TenantId $TenantId -Credential $Credential
+          $SecurePassword = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
+          $Credential = New-Object System.Management.Automation.PSCredential ($ClientId, $SecurePassword)
 
-            Write-Host '📁 Validating PBIP structure...'
-            if (!(Test-Path -Path './powerbi/AdventureWorks Report.pbip')) {
-              throw 'PBIP project folder not found at expected location.'
-            }
+          Connect-FabricTenant -TenantId $TenantId -Credential $Credential
 
-            Write-Host '📦 Deploying PBIP project to workspace...'
-            Publish-FabricArtifact -Path './powerbi/AdventureWorks Report.pbip' -WorkspaceId $WorkspaceId -Overwrite
+          Write-Host "📁 Verifying PBIP project folder..."
+          if (!(Test-Path -Path './powerbi/AdventureWorks Report.pbip')) {
+            throw "❌ PBIP folder not found at './powerbi/AdventureWorks Report.pbip'."
+          }
 
-            Write-Host '✅ Deployment complete!'
-          "
+          Write-Host "📦 Deploying PBIP artifact to workspace..."
+          Publish-FabricArtifact -Path './powerbi/AdventureWorks Report.pbip' -WorkspaceId $WorkspaceId -Overwrite
+
+          Write-Host "✅ Deployment successful!"
+        '@
