@@ -1,7 +1,8 @@
 name: Export Power BI Items
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]  # 🔄 Triggers when you push to 'main'
 
 jobs:
   export:
@@ -17,11 +18,15 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 📦 Install MicrosoftPowerBIMgmt Module
+      - name: 📦 Install PowerShell Modules
         shell: pwsh
-        run: Install-Module MicrosoftPowerBIMgmt -Force -AcceptLicense
+        run: |
+          Install-Module MicrosoftPowerBIMgmt -Force -AcceptLicense
+          if (-not (Get-Module Az.Accounts -ListAvailable)) {
+            Install-Module Az.Accounts -Scope CurrentUser -Force
+          }
 
-      - name: 🚧 Prepare FabricPS Module
+      - name: 🔧 Download FabricPS-PBIP Module
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path ".\modules" -ErrorAction SilentlyContinue | Out-Null
@@ -35,11 +40,11 @@ jobs:
 
           Import-Module ".\modules\FabricPS-PBIP" -Force
 
-      - name: 🔐 Authenticate and Export Fabric Items
+      - name: 🔐 Authenticate & Export Items
         shell: pwsh
         run: |
           $SecureSecret = ConvertTo-SecureString -String $env:CLIENT_SECRET -AsPlainText -Force
-          $Credential = New-Object System.Management.Automation.PSCredential ($env:CLIENT_ID, $SecureSecret)
+          $Credential   = New-Object System.Management.Automation.PSCredential ($env:CLIENT_ID, $SecureSecret)
 
           Connect-PowerBIServiceAccount -ServicePrincipal `
             -TenantId $env:TENANT_ID `
