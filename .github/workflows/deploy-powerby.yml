@@ -42,10 +42,10 @@ jobs:
         run: pwsh -c "
           Import-Module './FabricPS-PBIP.psm1'
 
-          $ClientId = '${{ env.CLIENT_ID }}'
-          $ClientSecret = '${{ env.CLIENT_SECRET }}'
-          $TenantId = '${{ env.TENANT_ID }}'
-          $WorkspaceId = '${{ env.WORKSPACE_ID }}'
+          $ClientId = $env:CLIENT_ID
+          $ClientSecret = $env:CLIENT_SECRET
+          $TenantId = $env:TENANT_ID
+          $WorkspaceId = $env:WORKSPACE_ID
 
           if (-not $ClientId -or -not $ClientSecret -or -not $TenantId -or -not $WorkspaceId) {
             throw '🔐 Missing required environment variables.'
