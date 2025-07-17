@@ -71,4 +71,4 @@ jobs:
           Publish-FabricArtifact -Path './powerbi/AdventureWorks Report.pbip' -WorkspaceId $WorkspaceId -Overwrite
 
           Write-Host "✅ Deployment successful!"
-        '@
+          '@
