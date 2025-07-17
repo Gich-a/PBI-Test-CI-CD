@@ -1,4 +1,4 @@
-      - name: Install PowerShell and FabricPS Module
+      - name: Power BI Deployment Pipeline
         run: |
           sudo apt-get install -y powershell
           pwsh -Command "Install-Module -Name FabricPS -Scope CurrentUser -Force"
