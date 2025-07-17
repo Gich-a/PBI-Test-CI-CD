@@ -7,14 +7,18 @@ jobs:
   deploy:
     runs-on: windows-latest
     steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
       - name: 📦 Install Power BI PowerShell Modules
         shell: pwsh
         run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
 
-      - name: 🚀 Deploy PBIP to DEV Workspace
+      - name: ✅ Verify and Run Deployment Script
         shell: pwsh
         run: |
           if (!(Test-Path "scripts/deploy-pbip.ps1")) {
             throw "❌ Script file not found at 'scripts/deploy-pbip.ps1'"
           }
           & "scripts/deploy-pbip.ps1"
+
