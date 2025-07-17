@@ -33,11 +33,8 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🛠 Install PowerShell and FabricPS
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y powershell
-          pwsh -Command "Install-Module -Name FabricPS -Scope CurrentUser -Force"
+      - name: 🛠 Set up PowerShell
+        uses: actions/setup-powershell@v1
 
       - name: 🚀 Deploy PBIP to DEV Workspace
         env:
@@ -45,30 +42,28 @@ jobs:
           CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
           WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
-        run: pwsh -Command @'
-          Import-Module FabricPS
+        run: pwsh -c "
+          Import-Module './FabricPS-PBIP.psm1'
 
-          $ClientId = "${env:CLIENT_ID}"
-          $ClientSecret = "${env:CLIENT_SECRET}"
-          $TenantId = "${env:TENANT_ID}"
-          $WorkspaceId = "${env:WORKSPACE_ID}"
+          $ClientId = '${{ env.CLIENT_ID }}'
+          $ClientSecret = '${{ env.CLIENT_SECRET }}'
+          $TenantId = '${{ env.TENANT_ID }}'
+          $WorkspaceId = '${{ env.WORKSPACE_ID }}'
 
           if (-not $ClientId -or -not $ClientSecret -or -not $TenantId -or -not $WorkspaceId) {
-            throw "🔐 Missing one or more required environment variables."
+            throw '🔐 Missing required environment variables.'
           }
 
-          $SecurePassword = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
-          $Credential = New-Object System.Management.Automation.PSCredential ($ClientId, $SecurePassword)
+          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ClientSecret $ClientSecret
 
-          Connect-FabricTenant -TenantId $TenantId -Credential $Credential
-
-          Write-Host "📁 Verifying PBIP project folder..."
-          if (!(Test-Path -Path './powerbi/AdventureWorks Report.pbip')) {
-            throw "❌ PBIP folder not found at './powerbi/AdventureWorks Report.pbip'."
+          Write-Host '📁 Verifying PBIP project folder...'
+          $pbipPath = './powerbi/AdventureWorks Report.pbip'
+          if (!(Test-Path $pbipPath)) {
+            throw '❌ PBIP project folder not found.'
           }
 
-          Write-Host "📦 Deploying PBIP artifact to workspace..."
-          Publish-FabricArtifact -Path './powerbi/AdventureWorks Report.pbip' -WorkspaceId $WorkspaceId -Overwrite
+          Write-Host '📦 Deploying PBIP artifact...'
+          Publish-PowerBIProject -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
 
-          Write-Host "✅ Deployment successful!"
-          '@
+          Write-Host '✅ Deployment successful.'
+          "
