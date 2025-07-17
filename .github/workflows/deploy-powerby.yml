@@ -2,18 +2,24 @@ name: Power BI Deployment Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main] # Trigger deployment on push to main branch
 
 jobs:
   deploy-dev:
     runs-on: ubuntu-latest
+    name: Deploy PBIP to DEV Workspace
+
     steps:
-      - name: Install PowerShell and FabricPS Module
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠 Install PowerShell and FabricPS Module
         run: |
+          sudo apt-get update
           sudo apt-get install -y powershell
           pwsh -Command "Install-Module -Name FabricPS -Scope CurrentUser -Force"
 
-      - name: Deploy PBIP to DEV Workspace
+      - name: 🚀 Deploy PBIP to DEV Workspace
         env:
           TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
           CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
@@ -22,10 +28,24 @@ jobs:
         run: |
           pwsh -Command "
             Import-Module FabricPS
-            $secPassword = ConvertTo-SecureString '${{ env.CLIENT_SECRET }}' -AsPlainText -Force
-            $credentials = New-Object System.Management.Automation.PSCredential('${{ env.CLIENT_ID }}', $secPassword)
-            Connect-FabricTenant -TenantId '${{ env.TENANT_ID }}' -Credential $credentials
 
-            Write-Host '📁 Deploying PBIP folder to workspace...'
-            Publish-FabricArtifact -Path './powerbi/AdventureWorks Report Main.pbip' -WorkspaceId '${{ env.WORKSPACE_ID }}' -Overwrite
+            $ClientId = $env:CLIENT_ID
+            $ClientSecret = $env:CLIENT_SECRET
+            $TenantId = $env:TENANT_ID
+            $WorkspaceId = $env:WORKSPACE_ID
+
+            $SecurePassword = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ($ClientId, $SecurePassword)
+
+            Connect-FabricTenant -TenantId $TenantId -Credential $Credential
+
+            Write-Host '📁 Validating PBIP structure...'
+            if (!(Test-Path -Path './powerbi/AdventureWorks Report.pbip')) {
+              throw 'PBIP project folder not found at expected location.'
+            }
+
+            Write-Host '📦 Deploying PBIP project to workspace...'
+            Publish-FabricArtifact -Path './powerbi/AdventureWorks Report.pbip' -WorkspaceId $WorkspaceId -Overwrite
+
+            Write-Host '✅ Deployment complete!'
           "
