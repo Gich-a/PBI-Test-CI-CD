@@ -66,6 +66,13 @@ jobs:
           # This module must contain the 'Publish-PowerBIProject' function.
           Import-Module $modulePath
 
+          # --- DIAGNOSTIC STEP: List commands from the imported module ---
+          Write-Host "🔍 Listing commands available from '$($modulePath)' module:"
+          Get-Command -Module (Get-Module -Name FabricPS-PBIP).Name | Format-Table Name, CommandType
+          Write-Host "--------------------------------------------------------"
+          Write-Host "☝️ Please check the output above to ensure 'Publish-PowerBIProject' is listed."
+          # -----------------------------------------------------------
+
           # Retrieve credentials and identifiers from environment variables.
           $ClientId = $env:CLIENT_ID
           $ClientSecret = $env:CLIENT_SECRET
@@ -95,9 +102,9 @@ jobs:
           }
 
           # Publish the project to the specified Power BI workspace.
-          # -EnableRefresh will trigger a dataset refresh after publishing.
-          # -Overwrite will update the existing report and dataset if they already exist.
-          Write-Host '📦 Deploying PBIP artifact...'
-          Publish-PowerBIProject -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
+          # CORRECTED: Changed Publish-PowerBIProject to Import-FabricItem
+          # Assuming Import-FabricItem accepts -Path, -WorkspaceId, -EnableRefresh, -Overwrite
+          Write-Host '📦 Deploying PBIP artifact using Import-FabricItem...'
+          Import-FabricItem -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
 
           Write-Host '✅ Deployment successful.'
