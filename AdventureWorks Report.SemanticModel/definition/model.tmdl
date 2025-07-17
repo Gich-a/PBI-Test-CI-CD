@@ -1,0 +1,53 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+queryGroup 'Demo Queries'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup 'Transform File from Sales Data'
+
+	annotation PBI_QueryGroupOrder = 1
+
+queryGroup 'Transform File from Sales Data\Helper Queries'
+
+	annotation PBI_QueryGroupOrder = 0
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBIDesktopVersion = 2.145.1105.0 (25.07)+decbc46fce458c5b8d5109d6f32a743f2ac949c8
+
+annotation PBI_QueryOrder = ["Territory Lookup","Product Lookup","Product Categories Lookup","Product Subcategories Lookup","Largest Asset Management Firms","Customer Lookup","Calendar Lookup","Rolling Calendar","Sales Data","Sample File","Parameter1","Transform Sample File","Transform File","mavenfuzzyfactory_development order_item_refunds","mavenfuzzyfactory_development order_items","mavenfuzzyfactory_development orders","mavenfuzzyfactory_development products","mavenfuzzyfactory_development website_pageviews","mavenfuzzyfactory_development website_sessions","Server (Fuzzy Factory)","Database (Fuzzy Factory)","Returns Data","Measure Table"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table 'Territory Lookup'
+ref table 'Product Lookup'
+ref table 'Product Categories Lookup'
+ref table 'Product Subcategories Lookup'
+ref table 'Customer Lookup'
+ref table 'Calendar Lookup'
+ref table 'Rolling Calendar'
+ref table 'Sales Data'
+ref table 'Returns Data'
+ref table 'Measure Table'
+ref table 'Price Adjustment (%)'
+ref table 'Product Metric Selection'
+ref table 'Customer Metric Selection'
+ref table 'Model Measures'
+ref table 'Model Tables'
+ref table 'Model Columns'
+ref table 'Model Relationships'
+ref table 'Data Dictionary'
+
+ref role Europe
+ref role 'North America'
+ref role Pacific
+
+ref cultureInfo en-US
+
