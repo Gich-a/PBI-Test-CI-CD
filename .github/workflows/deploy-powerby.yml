@@ -13,4 +13,8 @@ jobs:
 
       - name: 🚀 Deploy PBIP to DEV Workspace
         shell: pwsh
-        run: scripts/deploy-pbip.ps1
+        run: |
+          if (!(Test-Path "scripts/deploy-pbip.ps1")) {
+            throw "❌ Script file not found at 'scripts/deploy-pbip.ps1'"
+          }
+          & "scripts/deploy-pbip.ps1"
