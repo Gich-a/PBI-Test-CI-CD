@@ -1,11 +1,10 @@
-name: Deploy Power BI
+name: Export Power BI Items
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  export:
     runs-on: windows-latest
 
     env:
@@ -18,22 +17,32 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 📦 Install Power BI PowerShell Modules
+      - name: 📦 Install MicrosoftPowerBIMgmt Module
         shell: pwsh
-        run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
+        run: Install-Module MicrosoftPowerBIMgmt -Force -AcceptLicense
 
-      - name: 🧪 Confirm Environment Variables
+      - name: 🚧 Prepare FabricPS Module
         shell: pwsh
         run: |
-          Write-Host "TENANT_ID: $env:TENANT_ID"
-          Write-Host "CLIENT_ID: $env:CLIENT_ID"
-          Write-Host "WORKSPACE_ID: $env:WORKSPACE_ID"
-          # Write-Host "CLIENT_SECRET: $env:CLIENT_SECRET"  # ❌ Avoid echoing secrets
+          New-Item -ItemType Directory -Path ".\modules" -ErrorAction SilentlyContinue | Out-Null
 
-      - name: ✅ Verify and Run Deployment Script
-        shell: pwsh
-        run: |
-          if (!(Test-Path "scripts/deploy-pbip.ps1")) {
-            throw "❌ Script file not found at 'scripts/deploy-pbip.ps1'"
+          @(
+            "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psm1",
+            "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psd1"
+          ) | ForEach-Object {
+            Invoke-WebRequest -Uri $_ -OutFile ".\modules\$(Split-Path $_ -Leaf)"
           }
-          & "scripts/deploy-pbip.ps1"
+
+          Import-Module ".\modules\FabricPS-PBIP" -Force
+
+      - name: 🔐 Authenticate and Export Fabric Items
+        shell: pwsh
+        run: |
+          $SecureSecret = ConvertTo-SecureString -String $env:CLIENT_SECRET -AsPlainText -Force
+          $Credential = New-Object System.Management.Automation.PSCredential ($env:CLIENT_ID, $SecureSecret)
+
+          Connect-PowerBIServiceAccount -ServicePrincipal `
+            -TenantId $env:TENANT_ID `
+            -Credential $Credential
+
+          Export-FabricItems -WorkspaceId $env:WORKSPACE_ID -Path "./export"
