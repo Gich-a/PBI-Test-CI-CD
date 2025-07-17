@@ -71,7 +71,8 @@ jobs:
 
           # Connect to the Power BI service using the service principal credentials.
           # This command is now available because the MicrosoftPowerBIMgmt module was installed in the previous step.
-          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ClientSecret $ClientSecret
+          # CORRECTED: Changed -ClientSecret to -ServicePrincipalSecret
+          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ServicePrincipalSecret $ClientSecret
 
           # Verify that the Power BI Project (PBIP) folder exists at the specified path.
           Write-Host '📁 Verifying PBIP project folder...'
