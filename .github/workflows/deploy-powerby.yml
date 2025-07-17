@@ -13,4 +13,4 @@ jobs:
 
       - name: 🚀 Deploy PBIP to DEV Workspace
         shell: pwsh
-        run: ./scripts/deploy-pbip.ps1
+        run: scripts/deploy-pbip.ps1
