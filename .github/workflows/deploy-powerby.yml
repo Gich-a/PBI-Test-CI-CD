@@ -45,12 +45,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🚀 Deploy PBIP to DEV Workspace
-        # This step uses PowerShell to deploy the Power BI project.
-        # It connects to the Power BI service using a service principal and then publishes the project.
+        # CORRECTED: Using 'shell: pwsh' is the recommended way to run multi-line PowerShell scripts in GitHub Actions.
+        # This avoids complex quoting issues that can arise from using 'run: pwsh -c "..."'.
+        shell: pwsh
         run: |
-          pwsh -c '
           # Import the custom PowerShell module for Fabric/Power BI operations.
-          Import-Module "./FabricPS-PBIP.psm1"
+          Import-Module './FabricPS-PBIP.psm1'
 
           # Retrieve credentials and identifiers from environment variables.
           $ClientId = $env:CLIENT_ID
@@ -58,12 +58,8 @@ jobs:
           $TenantId = $env:TENANT_ID
           $WorkspaceId = $env:WORKSPACE_ID
 
-          # CORRECTED: Use [string]::IsNullOrEmpty() for a more robust check of environment variables.
-          # This prevents a ParserError if any of the variables are empty.
-          if ([string]::IsNullOrEmpty($ClientId) -or 
-              [string]::IsNullOrEmpty($ClientSecret) -or 
-              [string]::IsNullOrEmpty($TenantId) -or 
-              [string]::IsNullOrEmpty($WorkspaceId)) {
+          # Use [string]::IsNullOrEmpty() for a more robust check of environment variables.
+          if ([string]::IsNullOrEmpty($ClientId) -or [string]::IsNullOrEmpty($ClientSecret) -or [string]::IsNullOrEmpty($TenantId) -or [string]::IsNullOrEmpty($WorkspaceId)) {
             throw '🔐 Missing required environment variables. Ensure PBI_TENANT_ID, PBI_CLIENT_ID, PBI_CLIENT_SECRET, and PBI_WORKSPACE_ID_DEV secrets are set.'
           }
 
@@ -74,7 +70,8 @@ jobs:
           Write-Host '📁 Verifying PBIP project folder...'
           $pbipPath = './powerbi/AdventureWorks Report.pbip'
           if (!(Test-Path $pbipPath)) {
-            throw ""❌ PBIP project folder not found at path: $pbipPath""
+            # CORRECTED: Removed extra quotes from the throw statement, as they are no longer needed when using 'shell: pwsh'.
+            throw "❌ PBIP project folder not found at path: $pbipPath"
           }
 
           # Publish the project to the specified Power BI workspace.
@@ -84,4 +81,3 @@ jobs:
           Publish-PowerBIProject -Path $pbipPath -WorkspaceId $WorkspaceId -EnableRefresh -Overwrite
 
           Write-Host '✅ Deployment successful.'
-          "
