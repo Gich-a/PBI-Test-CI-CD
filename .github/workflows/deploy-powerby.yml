@@ -69,10 +69,16 @@ jobs:
             throw '🔐 Missing required environment variables. Ensure PBI_TENANT_ID, PBI_CLIENT_ID, PBI_CLIENT_SECRET, and PBI_WORKSPACE_ID_DEV secrets are set.'
           }
 
+          # Convert the client secret to a secure string.
+          $SecureClientSecret = ConvertTo-SecureString -String $ClientSecret -AsPlainText -Force
+
+          # Create a PSCredential object. For service principal, ClientId acts as username.
+          $Credential = New-Object System.Management.Automation.PSCredential($ClientId, $SecureClientSecret)
+
           # Connect to the Power BI service using the service principal credentials.
           # This command is now available because the MicrosoftPowerBIMgmt module was installed in the previous step.
-          # CORRECTED: Changed -ClientSecret to -ServicePrincipalSecret
-          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -ApplicationId $ClientId -ServicePrincipalSecret $ClientSecret
+          # CORRECTED: Using -Credential parameter with a PSCredential object.
+          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -Credential $Credential
 
           # Verify that the Power BI Project (PBIP) folder exists at the specified path.
           Write-Host '📁 Verifying PBIP project folder...'
