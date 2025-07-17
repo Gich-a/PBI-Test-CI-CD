@@ -1,4 +1,5 @@
 name: Deploy Power BI
+
 on:
   push:
     branches: [ main ]
@@ -6,6 +7,13 @@ on:
 jobs:
   deploy:
     runs-on: windows-latest
+
+    env:
+      TENANT_ID:       ${{ secrets.PBI_TENANT_ID }}
+      CLIENT_ID:       ${{ secrets.PBI_CLIENT_ID }}
+      CLIENT_SECRET:   ${{ secrets.PBI_CLIENT_SECRET }}
+      WORKSPACE_ID:    ${{ secrets.PBI_WORKSPACE_ID_DEV }}
+
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -14,6 +22,14 @@ jobs:
         shell: pwsh
         run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
 
+      - name: 🧪 Confirm Environment Variables
+        shell: pwsh
+        run: |
+          Write-Host "TENANT_ID: $env:TENANT_ID"
+          Write-Host "CLIENT_ID: $env:CLIENT_ID"
+          Write-Host "WORKSPACE_ID: $env:WORKSPACE_ID"
+          # Write-Host "CLIENT_SECRET: $env:CLIENT_SECRET"  # ❌ Avoid echoing secrets
+
       - name: ✅ Verify and Run Deployment Script
         shell: pwsh
         run: |
@@ -21,4 +37,3 @@ jobs:
             throw "❌ Script file not found at 'scripts/deploy-pbip.ps1'"
           }
           & "scripts/deploy-pbip.ps1"
-
