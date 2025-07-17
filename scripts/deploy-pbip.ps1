@@ -1,11 +1,18 @@
 param (
   [string]$ModulePath = "./FabricPS-PBIP.psm1",
   [string]$PbipPath = "./powerbi/AdventureWorks Report.pbip",
-  [string]$TenantId = $env:TENANT_ID,
-  [string]$ClientId = $env:CLIENT_ID,
-  [string]$ClientSecret = $env:CLIENT_SECRET,
-  [string]$WorkspaceId = $env:WORKSPACE_ID
+  [string]$TenantId,
+  [string]$ClientId,
+  [string]$ClientSecret,
+  [string]$WorkspaceId
 )
+
+# 🔁 Match parameter names with GitHub environment variable names
+if (-not $TenantId)      { $TenantId      = $env:TENANT_ID }
+if (-not $ClientId)      { $ClientId      = $env:CLIENT_ID }
+if (-not $ClientSecret)  { $ClientSecret  = $env:CLIENT_SECRET }
+if (-not $WorkspaceId)   { $WorkspaceId   = $env:WORKSPACE_ID }
+
 
 Write-Host "📁 Verifying custom PowerShell module at path: $ModulePath"
 if (!(Test-Path $ModulePath)) {
