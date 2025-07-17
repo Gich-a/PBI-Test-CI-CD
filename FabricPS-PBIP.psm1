@@ -38,16 +38,20 @@ foreach ($nuget in $nugets) {
    
 }
 
-function Write-Log{
-    param
-    (
-        $message
-        ,
-        $foregroundColor = [System.Console]::ForegroundColor
+function Write-Log {
+    param (
+        [string]$message,
+        [System.ConsoleColor]$foregroundColor = [System.Console]::ForegroundColor
     )
+
+    # Validate color fallback
+    if (-not [Enum]::IsDefined([System.ConsoleColor], $foregroundColor)) {
+        $foregroundColor = 'Gray'
+    }
 
     Write-Host "[$([datetime]::Now.ToString("s"))] $message" -ForegroundColor $foregroundColor
 }
+
 
 function Get-FabricAuthToken {
     <#
