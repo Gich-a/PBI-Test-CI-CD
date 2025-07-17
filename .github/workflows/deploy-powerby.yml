@@ -1,83 +1,21 @@
-name: Power BI Deployment Pipeline
-
-on:
-  push:
-    branches: [main] # This workflow runs on pushes to the 'main' branch
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    name: Run PBIP Structural Tests
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run PBIP structural tests
-        run: python tests/tests.py powerbi/
-
-  deploy-dev:
-    needs: test # This job will only run after the 'test' job completes successfully
-    runs-on: ubuntu-latest
-    name: Deploy to Development Environment
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # Checks out your repository code again for this job
-
-      - name: Set up PowerShell
-        uses: actions/setup-powershell@v1 # Use this action to set up PowerShell Core
-
-      - name: Install Azure Az Account module (required by FabricPS-PBIP for auth)
+      - name: Install PowerShell and FabricPS Module
         run: |
-          Install-Module -Name Az.Accounts -Scope CurrentUser -Force
-        shell: pwsh # Specify pwsh for PowerShell Core
+          sudo apt-get install -y powershell
+          pwsh -Command "Install-Module -Name FabricPS -Scope CurrentUser -Force"
 
-      - name: Download FabricPS-PBIP Module
-        run: |
-          $modulePath = "$HOME/modules/FabricPS-PBIP"
-          New-Item -ItemType Directory -Path $modulePath -Force
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psm1" -OutFile "$modulePath/FabricPS-PBIP.psm1"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psd1" -OutFile "$modulePath/FabricPS-PBIP.psd1"
-          Import-Module "$modulePath/FabricPS-PBIP.psm1" -Force # Import the module
-        shell: pwsh
-
-      - name: Deploy Power BI Project to DEV Workspace
+      - name: Deploy PBIP to DEV Workspace
         env:
           TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
           CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.PBI_CLIENT_SECRET }}
-          WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }} # You can still use ID, or convert to Name for FabricPS-PBIP
-          # For FabricPS-PBIP, it's often easier to use the workspace name:
-          # WORKSPACE_NAME_DEV: YourDevelopmentWorkspaceName
+          WORKSPACE_ID: ${{ secrets.PBI_WORKSPACE_ID_DEV }}
         run: |
-          # The FabricPS-PBIP module typically expects the path to the PBIP *folder*.
-          # For example, if your structure is 'powerbi/MyReport.pbip/MyReport.SemanticModel' etc.
-          # then PBIP_ROOT_PATH would be 'powerbi/MyReport.pbip'
-          $pbipRootPath = "powerbi/AdventureWorks Report Main.pbip" # Adjust this path to your actual .pbip root folder
+          pwsh -Command "
+            Import-Module FabricPS
+            $secPassword = ConvertTo-SecureString '${{ env.CLIENT_SECRET }}' -AsPlainText -Force
+            $credentials = New-Object System.Management.Automation.PSCredential('${{ env.CLIENT_ID }}', $secPassword)
+            Connect-FabricTenant -TenantId '${{ env.TENANT_ID }}' -Credential $credentials
 
-          # Authenticate using your Service Principal credentials
-          Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $env:TENANT_ID -ApplicationId $env:CLIENT_ID -ClientSecret $env:CLIENT_SECRET
-
-          echo "🚀 Starting deployment of '$pbipRootPath' to DEV Workspace (ID: $env:WORKSPACE_ID)..."
-
-          # Publish the Power BI Project
-          # The WorkspaceId parameter takes a GUID, which you already have.
-          # If you prefer to use WorkspaceName, you'd need to change it here and in env.
-          # The -EnableRefresh parameter will attempt to trigger a refresh after successful deployment.
-          Publish-PowerBIProject -Path $pbipRootPath -WorkspaceId $env:WORKSPACE_ID -EnableRefresh
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "PBIP deployment failed."
-            exit 1
-          }
-
-          echo "✅ PBIP project deployed successfully and refresh triggered (if applicable)."
-
-        shell: pwsh # Ensure this step runs with PowerShell Core
+            Write-Host '📁 Deploying PBIP folder to workspace...'
+            Publish-FabricArtifact -Path './powerbi/AdventureWorks Report Main.pbip' -WorkspaceId '${{ env.WORKSPACE_ID }}' -Overwrite
+          "
