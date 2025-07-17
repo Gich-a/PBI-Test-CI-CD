@@ -1,11 +1,11 @@
-name: Export Power BI Items
+name: Import Power BI Items
 
 on:
   push:
-    branches: [ main ]  # 🔄 Triggers when you push to 'main'
+    branches: [ main ]  # 🔄 Trigger on push to 'main'
 
 jobs:
-  export:
+  deploy:
     runs-on: windows-latest
 
     env:
@@ -40,7 +40,7 @@ jobs:
 
           Import-Module ".\modules\FabricPS-PBIP" -Force
 
-      - name: 🔐 Authenticate & Export Items
+      - name: 🔐 Authenticate & Import Items
         shell: pwsh
         run: |
           $SecureSecret = ConvertTo-SecureString -String $env:CLIENT_SECRET -AsPlainText -Force
@@ -50,4 +50,4 @@ jobs:
             -TenantId $env:TENANT_ID `
             -Credential $Credential
 
-          Export-FabricItems -WorkspaceId $env:WORKSPACE_ID -Path "./export"
+          Import-FabricItems -WorkspaceId $env:WORKSPACE_ID -Path "./powerbi"
