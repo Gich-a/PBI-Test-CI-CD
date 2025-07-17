@@ -44,19 +44,27 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # CORRECTED: Added a step to install the required Power BI management modules.
+      # Install the required Power BI management modules.
       # The 'Connect-PowerBIServiceAccount' cmdlet is part of this module.
       - name: 📦 Install Power BI PowerShell Modules
         shell: pwsh
         run: Install-Module -Name MicrosoftPowerBIMgmt -Force -AcceptLicense
 
       - name: 🚀 Deploy PBIP to DEV Workspace
-        # This script now runs after the required modules have been installed.
         shell: pwsh
         run: |
+          # Define the path to the custom PowerShell module.
+          $modulePath = './FabricPS-PBIP.psm1'
+
+          # Verify that the custom PowerShell module exists.
+          Write-Host "📁 Verifying custom PowerShell module at path: $modulePath"
+          if (!(Test-Path $modulePath)) {
+            throw "❌ Custom PowerShell module not found at path: $modulePath. Please ensure 'FabricPS-PBIP.psm1' exists in your repository's root or adjust the path."
+          }
+
           # Import the custom PowerShell module for Fabric/Power BI operations.
-          # This module likely contains the custom 'Publish-PowerBIProject' function.
-          Import-Module './FabricPS-PBIP.psm1'
+          # This module must contain the 'Publish-PowerBIProject' function.
+          Import-Module $modulePath
 
           # Retrieve credentials and identifiers from environment variables.
           $ClientId = $env:CLIENT_ID
@@ -77,7 +85,6 @@ jobs:
 
           # Connect to the Power BI service using the service principal credentials.
           # This command is now available because the MicrosoftPowerBIMgmt module was installed in the previous step.
-          # CORRECTED: Using -Credential parameter with a PSCredential object.
           Connect-PowerBIServiceAccount -ServicePrincipal -TenantId $TenantId -Credential $Credential
 
           # Verify that the Power BI Project (PBIP) folder exists at the specified path.
